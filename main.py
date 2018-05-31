@@ -13,16 +13,16 @@ class NetworkScanner:
         }
         print("Scanner created.")
 
-    def nmap_constructor(self, target_url, options):
-        self.nmap_command = "nmap" + str(target_url) + self.options_list[options]
-        self.nmap_process = subprocess.Popen(self.nmap_command, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+    def nmap_scan(self, target_url, options):
+        self.nmap_command = "nmap " + str(target_url) + " " + self.options_list[options]
+        self.nmap_process = subprocess.Popen(self.nmap_command, shell=True)# stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         target_info = self.nmap_process.stdout
         self.nmap_process.wait()
         return target_info
 
     def scan_network(self, target_url, options):
         print("Scanning network: {} with following options: {}".format(target_url, options))
-        target_info = self.nmap_constructor(target_url, options)
+        target_info = self.nmap_scan(target_url, options)
         print("Found the following from scan:\n {}".format(target_info))
         return target_info
 
@@ -79,6 +79,6 @@ if __name__ == '__main__':
     exp = Exploit()
     post_exploit = PostExploitation()
     controller = HostController(net_scan, data_search, exp, post_exploit)
-    controller.start_exploit('127.0.0.1', 0)
+    controller.start_exploit('127.0.0.1', 'Normal')
     controller.ping_host('127.0.0.1')
     controller.test_control()
