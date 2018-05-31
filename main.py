@@ -7,16 +7,18 @@ class NetworkScanner:
         self.nmap_process = None
         self.options_list = {
             0: '-F',
-            'Quiet': '-sS -T3 -f',
-            'Normal': '-sV -T4 -O --script=banner',
-            'Loud' : '-A -T5 --script=banner'
+            'Quiet': '-sS -T3 -f -oG scan.txt',
+            'Normal': '-sV -T4 -O --script=banner -oG scan.txt',
+            'Loud' : '-A -T5 --script=banner -oG scan.txt'
         }
         print("Scanner created.")
 
     def nmap_scan(self, target_url, options):
         self.nmap_command = "nmap " + str(target_url) + " " + self.options_list[options]
-        self.nmap_process = subprocess.Popen(self.nmap_command, shell=True)# stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        target_info = self.nmap_process.stdout
+        self.nmap_process = subprocess.Popen(self.nmap_command, shell=True)
+        #target_info = self.nmap_process.stdout
+        with open('scan.txt') as f:
+            target_info = f.readlines()
         self.nmap_process.wait()
         return target_info
 
