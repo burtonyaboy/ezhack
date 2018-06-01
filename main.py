@@ -3,6 +3,7 @@
 import subprocess
 import xmltodict
 import os
+import sys
 
 #global variables to be later changed to user input
 hosts = ['127.0.0.1']
@@ -44,13 +45,14 @@ class NetworkScanner:
         print("[*]" + self.nmap_command)
         #execute command and wait for it to finish
         self.nmap_process = subprocess.Popen(
-            self.nmap_command, 
-            shell=True)
-        self.nmap_process.wait()
+            self.nmap_command,
+            shell=True,
+            stdout=subprocess.PIPE)
+        sys.stdout.flush()
+        self.nmap_process.communicate()
 
     #main controller of the scanner
     def scan_network(self, host, options):
-        #print("[+]Scanning network: {} with following options: {}".format(host.ip_addr, options))
         self.nmap_scan(host.ip_addr, options)
         host.open_ports = self.parse_target_data()
         return 0
