@@ -15,6 +15,7 @@ class Host:
     def __init__(self, ip_addr):
         self.ip_addr = ip_addr
         self.open_ports = {}
+        self.os_info = {}
 
 #has a flexible network scanner and parses data
 #to format which is useful for metasploit
@@ -65,24 +66,43 @@ class NetworkScanner:
             target = xmltodict.parse(f.read())
         #for each port grab the cpe and each of its components
         #then add this to the open_ports dictionary for the host
-        for port in target['nmaprun']['host']['ports']['port']:
-            open_ports.update({port['@portid'] : {
-                'protocol' : port['@protocol'],
-                'cpe': port['service']['cpe'],
-                'vendor' : port['service']['cpe'].split(':')[2],
-                'product' : port['service']['cpe'].split(':')[3],
-                'version' : port['service']['cpe'].split(':')[4]
-            }})
+        try:
+            for port in target['nmaprun']['host']['ports']['port']:
+                open_ports.update({port['@portid'] : {
+                    'protocol' : port['@protocol'],
+                    'cpe': port['service']['cpe'],
+                    'vendor' : port['service']['cpe'].split(':')[2],
+                    'product' : port['service']['@product'],
+                    'version' : port['service']['@version']
+                }})
+        #Parsing above doesn't work if there is only one port open
+        except TypeError as e:
+            try:
+                port = target['nmaprun']['host']['ports']['port']
+                open_ports.update({port['@portid'] : {
+                    'protocol' : port['@protocol'],
+                    'cpe': port['service']['cpe'],
+                    'vendor' : port['service']['cpe'].split(':')[2],
+                    'product' : port['service']['@product'],
+                    'version' : port['service']['@version']
+                }})
+            except IndexError as e:
+                pass
+        except Exception as e:
+            print("Unkown error, exiting.\n" + str(e))
+            quit(-1)
         return open_ports
 
 #use data to find a useful exploit
 class DatabaseFind:
 
     def __init__(self):
-        print("[+]Finder initialized.")
+        #set up class variables
+        pass
 
     def search_database(self, target_info, attack_type):
-        print("[+]Searching database for attacks of: {} with target platform: {}".format(attack_type, target_info))
+        #use information gained from scanning to find an
+        #appropriate vulnerability
         exploit_data = "Use exploits/windows/smb/net_api"
         return exploit_data
 
@@ -90,11 +110,12 @@ class DatabaseFind:
 class Exploit:
 
     def __init__(self):
-        self.msfp = None
-        print("[+]Exploit framework initialized.")
+        #set up local variables
+        pass
 
     def exploit(self, exploit_data, target_url):
-        print("[+]Exploited. Creating backdoor")
+        #execute exploit
+        pass
 
 #if necessary, first gain root
 #cover tracks
@@ -152,12 +173,5 @@ if __name__ == '__main__':
     for ip in hosts:
         host = Host(ip)
         controller.exploit_target(host, intensity)
-
-
-
-
-
-
-
 
 
