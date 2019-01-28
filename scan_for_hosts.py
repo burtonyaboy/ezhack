@@ -5,7 +5,7 @@ def find_hosts(interface='eth0'):
 	ip_addr = ifconfig.split()[1]
 	netmask = ifconfig.split()[3]
 	network = '.'.join(ip_addr.split('.')[0:3] + ['0-255'])
-	hosts = subprocess.getoutput(f'nmap -n -sn {network} -oG - | awk "/Up$/{print $2}"').split()
+	hosts = subprocess.getoutput(f'nmap -n -sn {network} -oG - | awk' + ' "/Up$/{print $2}"').split()
 	print(hosts)
 
 def main():
