@@ -6,12 +6,8 @@
 # Author: Isaac Burton
 # Date: 7-6-2018
 #
-# This project is the result of a paper one of my 
-# professors wrote. The goal is to design an electronic
-# warfare system using blackboard architecture for
-# decision making. The end product will look like a
-# heavyweight botnet framework capable of spreading to 
-# hosts with known and readily available exploits.
+# This file exists only for historical reasons and 
+# will soon be removed and replaced by 'ezhack.py'
 #
 # ----------------------------------------------------
 import subprocess, os, sys, json, random, time

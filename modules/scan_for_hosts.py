@@ -1,6 +1,6 @@
 import subprocess
 
-def scan_for_hosts(interface='eth0'):
+def find_hosts(interface='eth0'):
 	ip_list = []
 	ifconfig = subprocess.getoutput(f'ifconfig {interface} | grep  " inet "')
 	this_ip = ifconfig.split()[1]

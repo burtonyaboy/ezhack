@@ -1,6 +1,3 @@
-#!/usr/bin/python3
-
-
 import subprocess, threading, time
 import msgpack, http.client
 import pprint
