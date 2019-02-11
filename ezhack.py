@@ -1,6 +1,8 @@
-import scan_for_hosts, scan_target, lookup_exploit, exploit, post_exploit
+import ezhack
 
 import subprocess
+
+host_folder = '../hosts/'
 
 class Host:
     def __init__(self, ip_addr, hostname):
@@ -88,7 +90,6 @@ def lookup_exploit(host):
 	#override the old exploit data 
 	host.exploits = exploits
 	return 0
-
 
 
 def main():
